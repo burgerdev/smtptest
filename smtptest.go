@@ -43,9 +43,38 @@ func Exchange(_ context.Context, c net.Conn, data []byte) ([]byte, error) {
   return buf[:n], nil
 }
 
-func testMail() string {
+func runTest(ctx context.Context, conn net.Conn) error {
   date := fmt.Sprintf("Date: %s\r\n", time.Now().Format(time.RFC1123Z))
-  return (date + "Subject: Hello, World!\r\nFrom: no-reply@test.burgerdev.de\r\n\r\nHi there!\r\n.\r\n")
+  mail := (date + "Subject: Hello, World!\r\nFrom: no-reply@test.burgerdev.de\r\n\r\nHi there!\r\n.\r\n")
+  msg := []string{
+    "",
+    "HELO test.burgerdev.de\r\n",
+    "MAIL FROM: no-reply@test.burgerdev.de\r\n",
+    "RCPT TO: fritz_smtptest@burgerdev.de\r\n",
+    "DATA\r\n",
+    mail,
+    "QUIT\r\n",
+  }
+
+  for _, m := range msg {
+    fmt.Printf("client> %s", m)
+    if m == "" {
+      fmt.Printf("\n")
+    }
+    ans, err := Exchange(ctx, conn, []byte(m))
+    if err != nil {
+      return err
+    }
+    fmt.Printf("server> %s", ans)
+    resp, err := Parse(ans)
+    if err != nil {
+      return err
+    }
+    if !resp.IsOK() {
+      return fmt.Errorf("%+v", *resp)
+    }
+  }
+  return nil
 }
 
 func main() {
@@ -63,35 +92,9 @@ func main() {
     os.Exit(2)
   }
 
-  msg := []string{
-    "",
-    "HELO test.burgerdev.de\r\n",
-    "MAIL FROM: no-reply@test.burgerdev.de\r\n",
-    "RCPT TO: fritz_smtptest@burgerdev.de\r\n",
-    "DATA\r\n",
-    testMail(),
-    "QUIT\r\n",
-  }
-
-  for _, m := range msg {
-    fmt.Printf("client> %s", m)
-    if m == "" {
-      fmt.Printf("\n")
-    }
-    ans, err := Exchange(ctx, conn, []byte(m))
-    if err != nil {
-      fmt.Fprintf(os.Stderr, "%v\n", err)
-      os.Exit(2)
-    }
-    fmt.Printf("server> %s", ans)
-    resp, err := Parse(ans)
-    if err != nil {
-      fmt.Fprintf(os.Stderr, "%v\n", err)
-      os.Exit(2)
-    }
-    if !resp.IsOK() {
-      fmt.Fprintf(os.Stderr, "%+v\n", *resp)
-      os.Exit(2)
-    }
+  err = runTest(ctx, conn)
+  if err != nil {
+    fmt.Fprintf(os.Stderr, "%v\n", err)
+    os.Exit(2)
   }
 }
