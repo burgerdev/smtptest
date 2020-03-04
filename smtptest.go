@@ -52,8 +52,12 @@ func main() {
   ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
   defer cancel()
 
+  address := os.Getenv("SMTP_SERVER")
+  if address == "" {
+    address = "mail.burgerdev.de:smtp"
+  }
   dialer := &net.Dialer{}
-  conn, err := dialer.DialContext(ctx, "tcp", "mail.burgerdev.de:smtp")
+  conn, err := dialer.DialContext(ctx, "tcp", address)
   if err != nil {
     fmt.Fprintf(os.Stderr, "%v\n", err)
     os.Exit(2)
